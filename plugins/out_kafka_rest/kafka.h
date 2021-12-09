@@ -29,6 +29,8 @@ struct flb_kafka_rest {
     /* Kafka specifics */
     long partition;
     char *topic;
+    char *token;
+    size_t token_len;
     int message_key_len;
     char *message_key;
 
@@ -51,7 +53,7 @@ struct flb_kafka_rest {
 
     /* HTTP URI */
     char uri[256];
-    char *url_path;
+    char *path;
 
     /* Upstream connection to the backend server */
     struct flb_upstream *u;

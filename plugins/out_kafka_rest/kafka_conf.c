@@ -172,13 +172,24 @@ struct flb_kafka_rest *flb_kr_conf_create(struct flb_output_instance *ins,
         ctx->topic = flb_strdup("fluent-bit");
     }
 
-    /* Set partition based on topic */
-    tmp = flb_output_get_property("url_path", ins);
+    /* Kafka: token */
+    tmp = flb_output_get_property("token", ins);
     if (tmp) {
-        ctx->url_path = flb_strdup(tmp);
-        snprintf(ctx->uri, sizeof(ctx->uri) - 1, "%s/topics/%s", ctx->url_path, ctx->topic);
+        ctx->token = flb_strdup(tmp);
+        ctx->token_len = strlen(tmp);
+    }
+    else {
+        ctx->token = flb_strdup("");
+        ctx->token_len = 0;
+    }
+
+    /* Set partition based on topic */
+    tmp = flb_output_get_property("path", ins);
+    if (tmp) {
+        ctx->path = flb_strdup(tmp);
+        snprintf(ctx->uri, sizeof(ctx->uri) - 1, "/%s/topics/%s", ctx->path, ctx->topic);
     } else {
-        ctx->url_path = NULL;
+        ctx->path = NULL;
         snprintf(ctx->uri, sizeof(ctx->uri) - 1, "/topics/%s", ctx->topic);
     }
 
@@ -205,10 +216,10 @@ int flb_kr_conf_destroy(struct flb_kafka_rest *ctx)
     flb_free(ctx->time_key);
     flb_free(ctx->time_key_format);
 
-    if (ctx->url_path) {
-        flb_free(ctx->url_path);
+    if (ctx->path) {
+        flb_free(ctx->path);
     }
-
+    flb_free(ctx->token);
     if (ctx->include_tag_key) {
         flb_free(ctx->tag_key);
     }

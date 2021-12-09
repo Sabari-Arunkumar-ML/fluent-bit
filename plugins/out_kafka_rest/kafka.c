@@ -50,8 +50,14 @@ static struct flb_config_map config_map[] = {
     },
 
     {
-     FLB_CONFIG_MAP_STR, "url_path", NULL,
-     0, FLB_TRUE, offsetof(struct flb_kafka_rest, url_path),
+     FLB_CONFIG_MAP_STR, "token", "fluent-bit",
+     0, FLB_TRUE, offsetof(struct flb_kafka_rest, token),
+     "Specify the kafka token. "
+    },
+
+    {
+     FLB_CONFIG_MAP_STR, "path", NULL,
+     0, FLB_TRUE, offsetof(struct flb_kafka_rest, path),
      "Specify an optional HTTP URL path for the target web server, e.g: /something"
     },
 
@@ -280,6 +286,9 @@ static void cb_kafka_flush(struct flb_event_chunk *event_chunk,
     c = flb_http_client(u_conn, FLB_HTTP_POST, ctx->uri,
                         js, js_size, NULL, 0, NULL, 0);
     flb_http_add_header(c, "User-Agent", 10, "Fluent-Bit", 10);
+    if (ctx->token_len > 0) {
+        flb_http_add_header(c, "Authorization", 13, ctx->token, ctx->token_len);
+    }
     if (ctx->avro_http_header == FLB_TRUE) {
         flb_http_add_header(c,
                             "Content-Type", 12,
