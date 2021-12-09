@@ -3,8 +3,8 @@ version: v1-winbuild-{build}
 image: Visual Studio 2019
 
 platform:
-  - Win32
   - x64
+  - Win32
 
 environment:
   vspath: 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Community'
@@ -37,7 +37,7 @@ build_script:
   - cpack
 
 artifacts:
-  - path: build/td-agent-bit-*.exe
-    name: td-agent-bit
-  - path: build/td-agent-bit-*.zip
-    name: td-agent-bit-zip
+  - path: build/fluent-bit*.exe
+    name: fluent-bit.exe
+  - path: build/fluent-bit*.zip
+    name: fluent-bit-zip
