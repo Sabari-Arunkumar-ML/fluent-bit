@@ -264,6 +264,7 @@ REGISTER_FILTER_PLUGIN("filter_throttle_size")
 REGISTER_FILTER_PLUGIN("filter_tensorflow")
 REGISTER_FILTER_PLUGIN("filter_apm_uaparser")
 REGISTER_FILTER_PLUGIN("filter_apm_url_normalizer")
+REGISTER_FILTER_PLUGIN("filter_apm_siemparser")
 
 if(FLB_REGEX)
   REGISTER_FILTER_PLUGIN("filter_kubernetes")

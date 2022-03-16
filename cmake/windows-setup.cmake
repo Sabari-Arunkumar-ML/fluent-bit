@@ -90,6 +90,8 @@ set(FLB_FILTER_REWRITE_TAG    Yes)
 set(FLB_FILTER_GEOIP2         Yes)
 set(FLB_FILTER_APM_UAPARSER   Yes)
 set(FLB_FILTER_APM_URL_NORMALIZER  Yes)
+set(FLB_FILTER_APM_SIEMPARSER   Yes)
+
 
 # Search bison and flex executables
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
