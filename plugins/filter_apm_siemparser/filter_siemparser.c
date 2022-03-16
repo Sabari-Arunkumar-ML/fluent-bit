@@ -213,15 +213,8 @@ static int cb_modifier_filter(const void* data, size_t bytes,
         {
             old_record_key = &(kv + i)->key;
             old_record_value = &(kv + i)->val;
-            if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "message", 7))
-            {
-                flb_info("key %s", old_record_key->via.str.ptr);
-                char* message1 = flb_strndup(old_record_value->via.str.ptr, old_record_value->via.str.size);
-                flb_info("MESSAGE %s", message1);
-            }
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "EventID", 7))
             {
-                //flb_info("eventid %d", old_record_value->via.i64);
                 if (old_record_value->via.i64 == 4624 || old_record_value->via.i64 == 4625) {
                     flb_info("Login Event");
                     newEntries = 4;
@@ -245,7 +238,7 @@ static int cb_modifier_filter(const void* data, size_t bytes,
                     newEntries = 2;
                     msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
-                    eventToProcess = true;;
+                    eventToProcess = true;
                 }
                 if (old_record_value->via.i64 == 4616) {
                     newEntries = 4;
@@ -284,7 +277,14 @@ static int cb_modifier_filter(const void* data, size_t bytes,
             }
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "message", 7)) {
                 message = flb_strndup(old_record_value->via.str.ptr, old_record_value->via.str.size);
-                //flb_info("message %s", message);
+                while (message[i] != '\0')
+                {
+                    if (message[i] == '\t' || message[i] == '\r' || message[i] == '\n')
+                    {
+                         message[i] = ' ';
+                    }
+                    i++;
+                }
             }
         }
         for (i = 0; i < map_num; i++) {
