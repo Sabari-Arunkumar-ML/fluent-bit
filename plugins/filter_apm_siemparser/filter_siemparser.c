@@ -201,79 +201,93 @@ static int cb_modifier_filter(const void* data, size_t bytes,
         kv = obj->via.map.ptr;
         int i = 0;
         int EventID = 0;
-        char* Sid;
-        double  time;
-        char* OfficeLogInTime;
-        char* OfficeLogOutTime;
-        char* message;
-        char* SendingMessage;
+        char* Sid = NULL;
+        double  time = 0;
+        char* OfficeLogInTime = NULL;
+        char* OfficeLogOutTime = NULL;
+        char* message = NULL;
+        char* SendingMessage = NULL;
         int newEntries = 0;
         bool eventToProcess = false;
         for (i = 0; i < map_num; i++)
         {
             old_record_key = &(kv + i)->key;
             old_record_value = &(kv + i)->val;
+            flb_info("*****************");
+            flb_info("%s", old_record_key->via.str.ptr);
+            flb_info("%X", old_record_key->type);
+            flb_info("*****************");
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "EventID", 7))
             {
                 if (old_record_value->via.i64 == 4624 || old_record_value->via.i64 == 4625) {
-                    flb_info("Login Event");
                     newEntries = 4;
                     msgpack_pack_map(&packer, map_num + newEntries);
-                    EventID = old_record_value->via.i64;          
+                    EventID = old_record_value->via.i64;
                     eventToProcess = true;
+                    flb_info("%d", EventID);
+
                 }
                 if (old_record_value->via.i64 == 1033 || old_record_value->via.i64 == 1034) {
                     newEntries = 3;
                     msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
+                    flb_info("%d", EventID);
+
                 }
                 if (old_record_value->via.i64 == 4720) {
                     newEntries = 3;
                     msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
+                    flb_info("%d", EventID);
                 }
                 if (old_record_value->via.i64 == 4726) {
                     newEntries = 2;
                     msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
+                    flb_info("%d", EventID);
+
                 }
                 if (old_record_value->via.i64 == 4616) {
                     newEntries = 4;
                     msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
+                    flb_info("%d", EventID);
+
                 }
                 if (old_record_value->via.i64 == 104) {
                     newEntries = 2;
                     msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
+                    flb_info("%d", EventID);
+
                 }
 
             }
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "Sid", 3))
             {
                 Sid = flb_strndup(old_record_value->via.str.ptr, old_record_value->via.str.size);
-                //flb_info("sid %s", Sid);
+                flb_info("sid %s", Sid);
             }
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncmp(old_record_key->via.str.ptr, "time", 4))
             {
                 time = old_record_value->via.f64;
-                //flb_info("time %lu", time);
+                flb_info("time %f", time);
             }
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "OfficeLogInTime", 15)) {
-                
+
                 OfficeLogInTime = flb_strndup(old_record_value->via.str.ptr, old_record_value->via.str.size);
-                ///*flb_info*/("logintime %s", OfficeLogInTime);
+                flb_info("logintime %s", OfficeLogInTime);
             }
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "OfficeLogOutTime", 16))
             {
-                
+
                 OfficeLogOutTime = flb_strndup(old_record_value->via.str.ptr, old_record_value->via.str.size);
-               // flb_info("logouttime %s", OfficeLogOutTime);
+                flb_info("logouttime %s", OfficeLogOutTime);
             }
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "message", 7)) {
                 message = flb_strndup(old_record_value->via.str.ptr, old_record_value->via.str.size);
@@ -281,17 +295,20 @@ static int cb_modifier_filter(const void* data, size_t bytes,
                 {
                     if (message[i] == '\t' || message[i] == '\r' || message[i] == '\n')
                     {
-                         message[i] = ' ';
+                        message[i] = ' ';
                     }
                     i++;
                 }
+                flb_info("messsge %s", message);
             }
         }
         for (i = 0; i < map_num; i++) {
             msgpack_pack_object(&packer, (kv + i)->key);
             msgpack_pack_object(&packer, (kv + i)->val);
         }
-        if (eventToProcess == false){
+
+
+        if (eventToProcess == false) {
             continue;
         }
         flb_info("************************");
