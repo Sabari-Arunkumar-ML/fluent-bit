@@ -218,21 +218,21 @@ static int cb_modifier_filter(const void* data, size_t bytes,
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "EventID", 7))
             {
                 if (old_record_value->via.i64 == 4624 || old_record_value->via.i64 == 4625) {
-                    newEntries = 4;
+                    newEntries = 1;
                     msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
 
                 }
                 if (old_record_value->via.i64 == 1033 || old_record_value->via.i64 == 1034) {
-                    newEntries = 3;
+                    newEntries = 1;
                     msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
 
                 }
                 if (old_record_value->via.i64 == 4720) {
-                    newEntries = 3;
+                    newEntries = 1;
                     msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
