@@ -269,15 +269,12 @@ static int cb_modifier_filter(const void* data, size_t bytes,
             continue;
         }
         if (EventID == 4624 || EventID == 4625) {
-            flb_info("%d^%s^%s", EventID, accountName, accountDomain);
             sprintf(SendingMessage, "%d^%s^%s", EventID, accountName, accountDomain);
         }
         if (EventID == 4720) {
-            flb_info("%d^%s^%s", EventID, targetAccountName, targetAccountDomainName);
             sprintf(SendingMessage, "%d^%s^%s", EventID, targetAccountName, targetAccountDomainName);
         }
         if (EventID == 1033 || EventID == 1034) {
-            flb_info("%d^%s", EventID, Sid);
             sprintf(SendingMessage, "%d^%s", EventID, Sid);
         }
         flb_free(accountName);
@@ -287,7 +284,7 @@ static int cb_modifier_filter(const void* data, size_t bytes,
         flb_free(Sid);
         char* endln = "\n";
         strncat(SendingMessage, endln, strlen(endln));
-        flb_info("[%s] Sending siem message: %s", PLUGIN_NAME, SendingMessage);
+        flb_trace("[%s] Sending siem message: %s", PLUGIN_NAME, SendingMessage);
 
         siem_parser_status = get_agent_info(SendingMessage, atoi(ctx->port), &packer);
 
