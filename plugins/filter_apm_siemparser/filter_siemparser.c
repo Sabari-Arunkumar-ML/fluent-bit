@@ -218,22 +218,16 @@ static int cb_modifier_filter(const void* data, size_t bytes,
             if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, "EventID", 7))
             {
                 if (old_record_value->via.i64 == 4624 || old_record_value->via.i64 == 4625) {
-                    newEntries = 1;
-                    msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
 
                 }
                 if (old_record_value->via.i64 == 1033 || old_record_value->via.i64 == 1034) {
-                    newEntries = 1;
-                    msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
 
                 }
                 if (old_record_value->via.i64 == 4720) {
-                    newEntries = 1;
-                    msgpack_pack_map(&packer, map_num + newEntries);
                     EventID = old_record_value->via.i64;
                     eventToProcess = true;
                 }
@@ -260,11 +254,18 @@ static int cb_modifier_filter(const void* data, size_t bytes,
                 validEventFlag = true;
             }
         }
+        if (eventToProcess == true && validEventFlag == true) {
+            newEntries = 1;
+            msgpack_pack_map(&packer, map_num + newEntries);
+        }
+        else {
+            msgpack_pack_map(&packer, map_num);
+        }
         for (i = 0; i < map_num; i++) {
             msgpack_pack_object(&packer, (kv + i)->key);
             msgpack_pack_object(&packer, (kv + i)->val);
         }
-        if (eventToProcess == false|| validEventFlag ==false) {
+        if (eventToProcess == false || validEventFlag == false) {
             continue;
         }
         if (EventID == 4624 || EventID == 4625) {
@@ -279,21 +280,29 @@ static int cb_modifier_filter(const void* data, size_t bytes,
             flb_info("%d^%s", EventID, Sid);
             sprintf(SendingMessage, "%d^%s", EventID, Sid);
         }
+        flb_free(accountName);
+        flb_free(accountDomain);
+        flb_free(targetAccountName);
+        flb_free(targetAccountDomainName);
+        flb_free(Sid);
         char* endln = "\n";
         strncat(SendingMessage, endln, strlen(endln));
         flb_info("[%s] Sending siem message: %s", PLUGIN_NAME, SendingMessage);
 
         siem_parser_status = get_agent_info(SendingMessage, atoi(ctx->port), &packer);
+
         if (siem_parser_status == unable_to_connect)
         {
-            msgpack_sbuffer_destroy(&sbuffer);
-            return FLB_FILTER_NOTOUCH;
+            msgpack_pack_str(&packer, ACCOUNTYPE_LEN);
+            msgpack_pack_str_body(&packer, ACCOUNTYPE, ACCOUNTYPE_LEN);
+            msgpack_pack_str(&packer, DEFAULT_LEN);
+            msgpack_pack_str_body(&packer, DEFAULT, DEFAULT_LEN);
         }
-        msgpack_unpacked_destroy(&unpacked);
+    }
+         msgpack_unpacked_destroy(&unpacked);
         *out_buf = sbuffer.data;
         *out_size = sbuffer.size;
         return FLB_FILTER_MODIFIED;
-    }
 }
 static int cb_modifier_exit(void *data, struct flb_config *config)
 {

@@ -5,6 +5,8 @@
 #define DELAYINSEC 2
 #define LOOKUPKEY "agent_key"
 #define DEFAULT "Unknown"
+#define ACCOUNTYPE_LEN 11
+#define ACCOUNTYPE "accountType"
 #define DEFAULT_LEN 7
 #define BROWSER_NAME "browser_name"
 #define BROWSER_NAME_LEN 12
