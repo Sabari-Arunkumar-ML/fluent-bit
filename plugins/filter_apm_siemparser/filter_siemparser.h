@@ -5,26 +5,9 @@
 #define DELAYINSEC 2
 #define LOOKUPKEY "agent_key"
 #define DEFAULT "Unknown"
+#define ACCOUNTYPE_LEN 11
+#define ACCOUNTYPE "accountType"
 #define DEFAULT_LEN 7
-#define BROWSER_NAME "browser_name"
-#define BROWSER_NAME_LEN 12
-#define BROWSER_VER "browser_version"
-#define BROWSER_VER_LEN 15
-#define BROWSER "browser"
-#define BROWSER_LEN 7
-#define OS_NAME "OS_name"
-#define OS_NAME_LEN 7
-#define OS_VERSION "OS_version"
-#define OS_VERSION_LEN 10
-#define OS "OS"
-#define OS_LEN 2
-#define DEVICE "device"
-#define DEVICE_LEN 6
-#define DEVICE_BRAND "device_brand"
-#define DEVICE_BRAND_LEN 12
-#define DEVICE_MODEL "device_model"
-#define DEVICE_MODEL_LEN 12
-
 #define PORTKEY "port"
 
 enum siem_parser_status {
