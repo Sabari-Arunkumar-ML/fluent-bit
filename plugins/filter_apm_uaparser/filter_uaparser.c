@@ -8,7 +8,7 @@
 #include <fluent-bit/flb_time.h>
 #include <msgpack.h>
 #include <string.h>
-#include <io.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include "filter_uaparser.h"
 #define PLUGIN_NAME "filter:apm_uaparser"
@@ -114,38 +114,39 @@ static int get_agent_info(char *agent, int port, msgpack_packer *packer)
     int valread = 0, retry = 0;
     char buffer[1024] = {0};
     char *entry;
-    if (send(sock, agent, strlen(agent), 0) == -1)
-    {
-        flb_error("[%s] Error in sending the agent %s", PLUGIN_NAME, agent);
-        goto retry;
-    }
-    valread = recv(sock, buffer, 1024, 0);
-    if (valread == 0 || valread == -1)
-    {
-        retry:
-        do
+    int sockSendStatus = 1;
+    sockSend:
+        if ((sockSendStatus = send(sock, agent, strlen(agent), 0)) == -1)
         {
-            flb_info("[%s] Trying to reconnect the socket: retry %d/%d", PLUGIN_NAME, retry, RETRIES) ;
-            if (connect_socket(port) < 0)
-            {
-                flb_info("[%s] Unable to reconnect the socket", PLUGIN_NAME);
-                if (retry++ > RETRIES) {
-                    return unable_to_connect;
+            flb_error("[%s] Error in sending the agent %s", PLUGIN_NAME, agent);
+            goto retry;
+        }
+    sockReceive:
+        valread = recv(sock, buffer, 1024, 0);
+        if (valread < 0)
+        {
+            retry:
+                while(1)
+                {
+                    flb_info("[%s] Trying to reconnect the socket: retry %d/%d", PLUGIN_NAME, retry, RETRIES) ;
+                    if (connect_socket(port) < 0)
+                    {
+                        flb_info("[%s] Unable to reconnect the socket", PLUGIN_NAME);
+                        if (retry++ > RETRIES) {
+                            return unable_to_connect;
+                        }
+                        continue;
+                    }
+                    if (sockSendStatus == -1)
+                    {
+                        goto sockSend;
+                    }
+                    else
+                    {
+                        goto sockReceive;
+                    }
                 }
-                continue;
-            }
-            if (send(sock, agent, strlen(agent), 0) == -1)
-            {
-                flb_error("[%s] Error in sending the agent %s: retry %d/%d", PLUGIN_NAME, agent,  retry, RETRIES);
-                if (retry++ > RETRIES) {
-                    return unable_to_connect;
-                }
-                continue;
-            }
-            valread = recv(sock, buffer, 1024, 0);
-        } while (valread == 0);
-    }
-
+        }
     entry = strtok(buffer, "}");
     while (entry != NULL)
     {
@@ -262,16 +263,7 @@ static int cb_modifier_filter(const void *data, size_t bytes,
                 strncat(agent, endln, strlen(endln));
                 flb_trace("[%s] Sending agent: %s", PLUGIN_NAME, agentString);
                 //populates record map with agent information
-                if (retryCounter <= GLOBALRETRIES)
-                {
-                    uaparser_status = get_agent_info(agent, atoi(ctx->port), &packer);
-                }
-                else
-                {
-                    flb_debug("[%s] Max retry limit exceed, skipping agent fields", PLUGIN_NAME);
-                    uaparser_status = add_default;
-                    // add_default_ua_fields(&packer);
-                }
+                uaparser_status = get_agent_info(agent, atoi(ctx->port), &packer);               
                 flb_free(agent);
                 flb_free(agentString);
             }
@@ -284,11 +276,12 @@ static int cb_modifier_filter(const void *data, size_t bytes,
     if (uaparser_status == agent_not_available)
     {
         flb_error("[%s] Lookup key %s not found", PLUGIN_NAME, ctx->lookup_key);
+        msgpack_sbuffer_destroy(&sbuffer);
         return FLB_FILTER_NOTOUCH;
     }
     else if (uaparser_status == unable_to_connect)
     {
-        flb_error("[%s] Unable to establish connection with the socket server: Log retry %d/%d", PLUGIN_NAME, retryCounter, GLOBALRETRIES);
+        flb_error("[%s] Unable to establish connection with the socket server: Log retry %d", PLUGIN_NAME, retryCounter);
         retryCounter++;
         add_default_ua_fields(&packer);
     }

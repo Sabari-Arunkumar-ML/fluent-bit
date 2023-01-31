@@ -8,7 +8,7 @@
 #include <fluent-bit/flb_time.h>
 #include <msgpack.h>
 #include <string.h>
-#include <io.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include "filter_url_normalize.h"
 #define PLUGIN_NAME "filter:apm_url_normalizer"
@@ -111,48 +111,99 @@ static int cb_modifier_init_apm_url_norm(struct flb_filter_instance *f_ins,
 
 static int get_norm_url(char *path, int port, msgpack_packer *packer)
 {
-    int valread = 0, retry = 0;
-    char buffer[1024] = {0};
+    int size_recv = 0, retry = 0, total_size = 0;
+    int new_buffer_len_max = strlen(path) + (SOCKET_BUF_SIZE * 2);
+    flb_sds_t new_buffer = flb_sds_create_size(new_buffer_len_max);
+    if (!new_buffer) {
+        return data_collection_failed;
+    }
+    flb_sds_t tmp;
+    char buffer[SOCKET_BUF_SIZE];
     char *entry;
-    if (send(socketFD, path, strlen(path), 0) == -1)
+    int sockSendStatus = 1;
+sockSend:
+    if ((sockSendStatus = send(socketFD, path, strlen(path), 0)) == -1)
     {
         flb_error("[%s] Error in sending the agent %s", PLUGIN_NAME, path);
         goto retry;
     }
-    valread = recv(socketFD, buffer, 1024, 0);
-    if (valread == 0 || valread == -1)
+    while (1)
     {
-        retry:
-        do
+        memset(buffer, 0, SOCKET_BUF_SIZE);
+        size_recv = recv(socketFD, buffer, SOCKET_BUF_SIZE, 0);
+        if (size_recv < 0)
         {
-            flb_info("[%s] Trying to reconnect the socket: retry %d/%d", PLUGIN_NAME, retry, RETRIES) ;
-            if (connect_socket(port) < 0)
-            {
-                flb_info("[%s] Unable to reconnect the socket", PLUGIN_NAME);
-                if (retry++ > RETRIES) {
-                    return unable_to_connect;
+            retry:
+                while (1)
+                {
+                    flb_info("[%s] Trying to reconnect the socket: retry %d/%d", PLUGIN_NAME, retry, RETRIES) ;
+                    if (connect_socket(port) < 0)
+                    {
+                        flb_info("[%s] Unable to reconnect the socket", PLUGIN_NAME);
+                        if (retry++ > RETRIES) {
+                            flb_sds_destroy(new_buffer);
+                            return unable_to_connect;
+                        }
+                        continue;
+                    }
+                    retry = 0;
+                    if (sockSendStatus == -1)
+                    {
+                        goto sockSend;
+                    }
+                    break;
                 }
-                continue;
-            }
-            if (send(socketFD, path, strlen(path), 0) == -1)
+        }
+        else
+        {
+            if (size_recv == 5) 
             {
-                flb_error("[%s] Error in sending the agent %s: retry %d/%d", PLUGIN_NAME, path,  retry, RETRIES);
-                if (retry++ > RETRIES) {
-                    return unable_to_connect;
+                bool to_discard = (strcmp(buffer, END_OF_MESSAGE) == 0);
+                if (to_discard)
+                {
+                    flb_debug("~eom~ sent by the socket: %d",size_recv);
+                    break;
                 }
-                continue;
             }
-            valread = recv(socketFD, buffer, 1024, 0);
-        } while (valread == 0);
+           
+            flb_debug("Socket data being received in chunks: %d",size_recv);
+            if (total_size + size_recv <= new_buffer_len_max)
+            {
+                tmp = flb_sds_cat(new_buffer, buffer, size_recv);
+                if (!tmp) {
+                    flb_sds_destroy(new_buffer);
+                    return data_collection_failed;
+                }
+                new_buffer = tmp;
+                total_size += size_recv;
+            }
+            else
+            {
+                flb_error("Buffer Overflow occurred = %s ", buffer);
+                break;
+            }
+            
+            if (size_recv < SOCKET_BUF_SIZE)
+            {
+                break;
+            }
+        }
     }
 
-    entry = strtok(buffer, "}");
+    int desiredSplit = NEW_ENTRIES * 2;
+    entry = strtok(new_buffer, "}");
     while (entry != NULL)
     {
+        if (desiredSplit == 0 )
+        {
+            break;
+        }
         msgpack_pack_str(packer, strlen(entry));
         msgpack_pack_str_body(packer, entry, strlen(entry));
         entry = strtok(NULL, "}");
+        desiredSplit = desiredSplit - 1;
     }
+    flb_sds_destroy(new_buffer);
     return data_collected;
 }
 
@@ -178,7 +229,6 @@ static int cb_modifier_filter_apm_url_norm(const void *data, size_t bytes,
     msgpack_packer_init(&packer, &sbuffer, msgpack_sbuffer_write);
     msgpack_unpacked_init(&unpacked);
     size_t urlpath_len = 0;
-    char *urlpath;
     while (msgpack_unpack_next(&unpacked, data, bytes, &off) == MSGPACK_UNPACK_SUCCESS)
     {
 
@@ -205,9 +255,9 @@ static int cb_modifier_filter_apm_url_norm(const void *data, size_t bytes,
         {
             old_record_key = &(kv + i)->key;
             old_record_value = &(kv + i)->val;
-            if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, ctx->lookup_key, ctx->lookup_key_len))
+            if (old_record_key->type == MSGPACK_OBJECT_STR && !strncasecmp(old_record_key->via.str.ptr, ctx->lookup_key, ctx->lookup_key_len) && old_record_value->via.str.size != 0)
             {
-                urlpath = flb_strndup(old_record_value->via.str.ptr, old_record_value->via.str.size);
+                char *urlpath = flb_strndup(old_record_value->via.str.ptr, old_record_value->via.str.size);
                 urlpath_len =  old_record_value->via.str.size;
                 char *endln = "\n" ;
                 char *formattedPath = (char *)flb_malloc(old_record_value->via.str.size + 4);
@@ -215,16 +265,21 @@ static int cb_modifier_filter_apm_url_norm(const void *data, size_t bytes,
                 strncat(formattedPath, endln, strlen(endln));
                 flb_trace("[%s] Sending url path for normalization: %s", PLUGIN_NAME, urlpath);
                 //populates record map with agent information
-                if (retryConnectCounter <= GLOBALRETRIES)
+                collection_status = get_norm_url(formattedPath, atoi(ctx->port), &packer);
+                if (collection_status != data_collected)
                 {
-                    collection_status = get_norm_url(formattedPath, atoi(ctx->port), &packer);
-                }
-                else
-                {
-                    flb_debug("[%s] Max retry limit exceed, skipping agent fields", PLUGIN_NAME);
-                    //collection_status = add_default;
+                    if (collection_status == unable_to_connect) 
+                    {
+                        flb_error("[%s] Unable to establish connection with the socket server: Log retry %d/%d", PLUGIN_NAME, retryConnectCounter, GLOBALRETRIES);
+                        retryConnectCounter++;
+                    }
+                    msgpack_pack_str(&packer, NORMALIZED_PATH_LEN);
+                    msgpack_pack_str_body(&packer, NORMALIZED_PATH, NORMALIZED_PATH_LEN);
+                    msgpack_pack_str(&packer, urlpath_len);
+                    msgpack_pack_str_body(&packer, urlpath, urlpath_len);
                 }
                 flb_free(formattedPath);
+                flb_free(urlpath);
             }
             msgpack_pack_object(&packer, (kv + i)->key);
             msgpack_pack_object(&packer, (kv + i)->val);
@@ -232,23 +287,12 @@ static int cb_modifier_filter_apm_url_norm(const void *data, size_t bytes,
     }
     // flb_error(collection_status);
     msgpack_unpacked_destroy(&unpacked);
-    
     if (collection_status == url_path_not_available)
     {
-        flb_error("[%s] Lookup key %s not found", PLUGIN_NAME, ctx->lookup_key);
+        flb_error("[%s] Lookup key %s not found in the log record", PLUGIN_NAME, ctx->lookup_key);
+        msgpack_sbuffer_destroy(&sbuffer);
         return FLB_FILTER_NOTOUCH;
     }
-    else if (collection_status == unable_to_connect)
-    {
-        flb_error("[%s] Unable to establish connection with the socket server: Log retry %d/%d", PLUGIN_NAME, retryConnectCounter, GLOBALRETRIES);
-        retryConnectCounter++;
-        msgpack_pack_str(&packer, NORMALIZED_PATH_LEN);
-        msgpack_pack_str_body(&packer, NORMALIZED_PATH, NORMALIZED_PATH_LEN);
-        msgpack_pack_str(&packer, urlpath_len);
-        msgpack_pack_str_body(&packer, urlpath, urlpath_len);
-        flb_free(urlpath);
-    }
-    
     *out_buf = sbuffer.data;
     *out_size = sbuffer.size;
     return FLB_FILTER_MODIFIED;
