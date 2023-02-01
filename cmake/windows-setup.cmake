@@ -91,6 +91,7 @@ set(FLB_FILTER_GEOIP2         Yes)
 set(FLB_FILTER_APM_UAPARSER   Yes)
 set(FLB_FILTER_APM_URL_NORMALIZER  Yes)
 set(FLB_FILTER_APM_SIEMPARSER   Yes)
+set(FLB_FILTER_APM_GEOIP Yes)
 
 
 # Search bison and flex executables
